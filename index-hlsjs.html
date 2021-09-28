@@ -61,6 +61,11 @@
     /* Make the fit-to-screen margins black instead of white. */
     /* FIXME: It's generally wrong to set background alone */
     video {background-color: black}
+    /* Hide some controls that are wrong and unnecessary for live streams */
+    /* ref: https://github.com/interglobalmedia/custom-html5-video-player/blob/master/styles/styles.css */
+    video::-webkit-media-controls-current-time-display {display: none}
+    video::-webkit-media-controls-time-remaining-display {display: none}
+    video::-webkit-media-controls-timeline {display: none}
   </style>
 </head>
 
