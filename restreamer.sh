@@ -1,6 +1,8 @@
 #!/bin/bash
 stream_url="$1"
 
+test -d html_dir/stream || mkdir html_dir/stream
+
 youtubedl_args=(
     # Stop running once the stream ends
     # FIXME: May stop running when there's a short-term transient issue?
@@ -14,6 +16,7 @@ ffmpeg_args=(
     # This instructs the browser to treat it as a "live" HLS stream and keep checking back on the playlist file.
     -hls_playlist_type event
 
+    # FINDME: Change these values for less live delay
     # This is *supposed* to only keep the latest 6 .ts files in the playlist,
     # and delete old .ts files whenever there's more than 9 in the filesystem
     -hls_list_size 6 -hls_delete_threshold 3 -hls_flags delete_segments \
@@ -23,7 +26,7 @@ ffmpeg_args=(
 
     # This is where all the output files go.
     # The HTML only needs to reference the master_pl_name, HLS standards take care of the rest.
-    -master_pl_name master.m3u8 stream_%v/stream.m3u8 -hls_segment_filename stream_%v/data%02d.ts
+    -hls_segment_filename html_dir/stream/%v_data%02d.ts -master_pl_name master.m3u8 html_dir/stream/%v_playlist.m3u8
 )
 youtube-dl "${youtubedl_args[@]}" --output - -- "$stream_url" | ffmpeg -i - "${ffmpeg_args[@]}"
 
