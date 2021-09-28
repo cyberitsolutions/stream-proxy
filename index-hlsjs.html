@@ -1,0 +1,74 @@
+<head>
+  <!-- FIXME: Host this locally? -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
+  <script>
+    play_on_first_click = function() {
+      // Chrome doesn't toggle play/pause the first time the video element is clicked.
+      // It does every time after that. This is frustrating as hell.
+      if (this._stupid_property_to_record_if_Ive_been_here) {
+        return
+      } else {
+        this._stupid_property_to_record_if_Ive_been_here = true
+        if (this.paused) {
+          this.play()
+        }
+      }
+    }
+    fix_hls_video_elements = function() {
+      var video_elements = document.querySelectorAll('video');
+      video_elements.forEach(function (video) {
+        //
+        // First check for native browser HLS support
+        //
+        if (video.canPlayType('application/vnd.apple.mpegurl')) {
+          true  // do nothing, because the browser can handle it.
+          //
+          // If no native HLS support, check if HLS.js is supported
+          //
+        } else if (Hls.isSupported() && video.src.toLowerCase().endsWith('.m3u8')) {
+          // FIXME: Doesn't handle <video><source/></video> style
+          // FIXME: Is it really safe to assume all .m3u8 is HLS?
+          console.log("Handling media with HLS.js");
+          var hls = new Hls({autoStartLoad: false});
+          hls.loadSource(video.src);
+          hls.attachMedia(video);
+
+          // HLS.js replaces the poster with the first frame as soon as it loads.
+          // This is a problem if it's loading before it starts playing because the poster will instruct the user to press play.
+          // We can't trust autoplay because Chrome will not allow that for unmuted videos until the user interacts with the page in some way.
+          video.addEventListener('play',function() {
+            hls.startLoad();
+          });
+
+          // The autoplay property doesn't apply because HLS.js hadn't loaded the stream.
+          video.play().catch(
+            // But Chromium also won't let an unmuted video play until there's user interaction,
+            // I don't want the user to need to find the tiny play button to start playback.
+            // FIXME: Only catch DOMException
+            function() {video.onclick = play_on_first_click}
+          )
+        }
+      });
+    }
+    window.onload = fix_hls_video_elements;
+  </script>
+
+  <style>
+    /* Remove the ugly margin between the video element and the window edges */
+    body {margin: 0}
+    video {width: 100% ; height: 100%}
+    /* Make the fit-to-screen margins black instead of white. */
+    /* FIXME: It's generally wrong to set background alone */
+    video {background-color: black}
+  </style>
+</head>
+
+<body>
+  <video
+    controls autoplay
+
+    src="master.m3u8"
+    poster="press-play.png"
+  />
+</body>
