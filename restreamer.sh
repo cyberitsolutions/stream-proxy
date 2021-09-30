@@ -9,6 +9,8 @@ youtubedl_args=(
     --abort-on-unavailable-fragment
     # Output a file that can be played while still being downloaded
     --hls-use-mpegts
+
+    --format 'best[ext=mp4]'
 )
 ffmpeg_args=(
     # Output to HLS for browser playback with HLS.js
