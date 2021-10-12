@@ -1,4 +1,6 @@
 #!/usr/bin/python3
+import argparse
+import functools
 import http.server
 import pathlib
 import shutil
@@ -6,71 +8,60 @@ import subprocess
 import sys
 import time
 
-STREAM_URL = sys.argv[1]
-WORKING_DIR = pathlib.Path.cwd() / 'html_dir'
+from . import http_handler
+from . import inputs
+from . import outputs
 
-# FIXME: Risky
-if (WORKING_DIR / 'stream').is_dir():
-    shutil.rmtree(WORKING_DIR / 'stream')
-(WORKING_DIR / 'stream').mkdir()
+# Argument handling
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--hls-working-directory', metavar='PATH',
+        type=pathlib.Path, default = pathlib.Path.cwd() / 'hls_dir',
+        help="Where to store the temporary files for HLS output.")
+parser.add_argument('--input-address', metavar='URL',
+        help="Only accept this input address instead of letting the HLS client decide.")
+parser.add_argument('--multicast-output-address', metavar='IP:PORT',
+        help="Uses multicast output instead of starting the HLS web listener."
+        "Requires --input-address")
 
-class RequestHandler(http.server.SimpleHTTPRequestHandler):
-    def __init__(self, *args, directory=None):
-        if not directory:
-            directory = WORKING_DIR
+parser.add_argument('--http-listening-port',
+        type=int, default=80,
+        help="For running as non-root during development")
 
-        super().__init__(*args, directory=str(directory))
+args = parser.parse_args()
 
-    def send_head(self):
-        # Both do_GET and do_HEAD run this first, so this is the best spot to delay if file doesn't exist yet
-        path = pathlib.Path(self.translate_path(self.path))
-        if not path.exists():
-            # Just wait a couple seconds, it'll appear soon... hopefully
-            # FIXME: This should be done in the JS as a retry attempt,
-            # but I don't understand JS enough to get that deep in HLS.js yet
-            time.sleep(3)
-
-        return super().send_head()
+if args.multicast_output_address and not args.input_address:
+    # FIXME: Is it ok to use argparse's exceptions like this?
+    raise argparse.ArgumentError(args.multicast_output_address, "Can't specify a multicast output with including an input address")
 
 
-ytdl_proc = subprocess.Popen(['youtube-dl',
-        # Stop running once the stream ends
-        # FIXME: May stop running when there's a short-term transient issue?
-        '--abort-on-unavailable-fragment',
-        # Output a file that can be played while still being downloaded
-        '--hls-use-mpegts',
-        # Use the best mp4 available, mp4 theoretically reduces the re-encoding and re-muxing effort required
-        '--format=best[ext=mp4]',
-        # Send output to stdout
-        '--output','-',
-        # Grab from given stream URL
-        '--', STREAM_URL,
-    ], stdout=subprocess.PIPE)
-ffmpeg_proc = subprocess.Popen(['ffmpeg',
-        # Take input from stdin
-        '-i', '-',
-        # Output to HLS for browser playback with HLS.js
-        '-f', 'hls',
-        # This instructs the browser to treat it as a "live" HLS stream and keep checking back on the playlist file.
-        '-hls_playlist_type', 'event',
+if args.multicast_output_address:
+    # Multicast mode, easiest control mode there is
+    input_pipe = inputs.autoselect(args.input_address)
+    output_proc = outputs.multicast(input_pipe, args.multicast_output_address)
 
-        # FINDME: Change these values for less live delay
-        # This is *supposed* to only keep the latest 6 .ts files in the playlist,
-        # and delete old .ts files whenever there's more than 9 in the filesystem
-        '-hls_list_size', '6', '-hls_delete_threshold', '3', '-hls_flags', 'delete_segments',
-        # But that doesn't seem to have any effect at all, while this long deprecated option still works.
-        # FIXME: WHY?!?!?
-        '-hls_wrap', '12',
+    output_proc.wait()
 
-        # This is where all the output files go.
-        # The HTML only needs to reference the master_pl_name, HLS standards take care of the rest.
-        # NOTE: master_pl_name is somehow relative to one of the other args
-        '-hls_segment_filename', str(WORKING_DIR / 'stream' / '%v_data%02d.ts'),
-        '-master_pl_name', 'master.m3u8',
-        str(WORKING_DIR / 'stream' / '%v_playlist.m3u8'),
-    ], stdin=ytdl_proc.stdout)
+else:
+    # HLS mode, this is where things get trickier
+    if not args.input_address:
+        raise NotImplementedError("Can't auto detect input address yet")
 
-# This blocks forever
-http.server.test(HandlerClass=RequestHandler, port=8000)
+    # Make the working directory if it doesn't already exist
+    # FIXME: Should this just raise an exception instead?
+    if not hls_working_directory.is_dir():
+        hls_working_directory.mkdir()
 
-# FIXME: Wait for *any* 1 process to die, then kill everything.
+    input_pipe = inputs.autoselect(args.input_address)
+    output_proc = outputs.hls(input_pipe, (args.hls_working_directory/'stream') )
+
+    # This try except is only meant to clean up the ytdl & ffmpeg processes when Ctrl-C is pressed
+    try:
+        http_handler.start_server(bind_address=('0.0.0.0', args.http_listening_port), working_directory=args.hls_working_directory)
+    finally:
+        # Youtube-dl exits when it can't write to the output anymore
+        # Ffmpeg exits when it finishes reading from the input
+        # So closing the input pipe is enough to make them clean themselves up
+
+        # FIXME: Properly kill all processes, don't just rely on things cleaning up politely
+        input_pipe.close()
+        output_proc.wait()
