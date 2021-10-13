@@ -7,30 +7,33 @@ import urllib.parse
 #        Does closing stdout deal with that well enough?
 
 def use_ytdl(stream_url):
-    ytdl_proc = subprocess.Popen(['youtube-dl',
-            # Stop running once the stream ends
-            # FIXME: May stop running when there's a short-term transient issue?
-            '--abort-on-unavailable-fragment',
-            # Output a file that can be played while still being downloaded
-            '--hls-use-mpegts',
-            # Use the best mp4 available, mp4 theoretically reduces the re-encoding and re-muxing effort required
-            '--format=best[ext=mp4]',
-            # Send output to stdout
-            '--output','-',
-            # Grab from given stream URL
-            '--', stream_url,
-        ], stdout=subprocess.PIPE)
+    ytdl_proc = subprocess.Popen([
+        'youtube-dl',
+        # Stop running once the stream ends
+        # FIXME: May stop running when there's a short-term transient issue?
+        '--abort-on-unavailable-fragment',
+        # Output a file that can be played while still being downloaded
+        '--hls-use-mpegts',
+        # Use the best mp4 available, mp4 theoretically reduces the re-encoding and re-muxing effort required
+        '--format=best[ext=mp4]',
+        # Send output to stdout
+        '--output', '-'
+        # Grab from given stream URL
+        '--', stream_url,
+    ], stdout=subprocess.PIPE)
 
     return ytdl_proc.stdout
+
 
 def use_multicat(stream_url):
     # Multicat doesn't support long-options, so here's the descriptions for the short-options used:
     # -a     Append to existing destination file (risky)
     # -U     Destination has no RTP header
     # NOTE: multicat did not accept '-' or '/dev/stdout' as valid output
-    multicat_proc = subprocess.Popen(['multicat', multicast_address, '-a', '-U', '/dev/fd/1'], stdout=subprocess.PIPE)
+    multicat_proc = subprocess.Popen(['multicat', stream_url, '-a', '-U', '/dev/fd/1'], stdout=subprocess.PIPE)
 
     return multicat_proc.stdout
+
 
 def autoselect(stream_url):
     url = urllib.parse.urlparse(stream_url)
