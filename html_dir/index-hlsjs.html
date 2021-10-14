@@ -1,5 +1,9 @@
 <!DOCTYPE html>
 <head>
+  <!-- FIXME: Make this match the media input somehow? -->
+  <!--        Probably requires using JS to read that data from the mpeg stream unless we use HTML templates and process them in Python. -->
+  <title>Media player</title>
+
   <!-- FIXME: Host this locally? Even better, create a libjs-hlsjs.deb and pull this from that package. -->
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
@@ -76,5 +80,5 @@
 
     src="stream/master.m3u8"
     poster="press-play.svg"
-  />
+  ></video>
 </body>
