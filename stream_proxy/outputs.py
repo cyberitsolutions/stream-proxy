@@ -3,6 +3,9 @@ import subprocess
 
 
 def hls(input_pipe, output_dir: pathlib.Path):
+    if not output_dir.is_dir():
+        output_dir.mkdir()
+
     ffmpeg_proc = subprocess.Popen([
         'ffmpeg',
         # Take input from stdin

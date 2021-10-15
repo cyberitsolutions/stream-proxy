@@ -1,7 +1,16 @@
 import functools
 import http.server
+import importlib.resources
+import os.path
 import pathlib
+import shutil
 import time
+
+
+INCLUDED_HTTP_RESOURCES = [
+    'index.html',
+    'press-play.svg',
+]
 
 
 # Currently just adds a delay when the requested file doesn't exist yet.
@@ -14,7 +23,25 @@ import time
 #
 # NOTE: There is a new instance of this class for every single request
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
+    def translate_path(self, path):
+        """Wraps parent translate_path to get a couple of always-available resources from the root of the working directory."""
+        translated = super().translate_path(path)
+        filename = translated.rpartition('/')[2]
+
+        if not filename:
+            # Default to index.html if trying to browse a directory
+            filename = 'index.html'
+
+        if filename in ('index.html', 'press-play.svg'):
+            # NOTE: This depends on filename not starting with a '/',
+            #       otherwise it will leave off the directory.
+            translated = os.path.join(self.directory, filename)
+
+        return translated
+
     def send_head(self):
+        # FIXME: Delay *only* for master.m3u8
+        # FIXME: Use this to trigger the youtube-dl|ffmpeg process when the master.m3u8 (or index.html?) is requested
         # Both do_GET and do_HEAD run this first, so this is the easiest spot to delay if file doesn't exist yet
         path = pathlib.Path(self.translate_path(self.path))
         if not path.exists():
@@ -22,12 +49,21 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             # FIXME: This should be done in the JS as a retry attempt,
             # but I don't understand JS enough to get that deep in HLS.js yet
             time.sleep(3)
-
         return super().send_head()
 
 
+def setup_working_directory(working_directory):
+    # FIXME: Should this just raise an exception instead?
+    if not working_directory.is_dir():
+        working_directory.mkdir()
+
+    # FIXME: Why is importlib.resources.contents() not showing the resources?
+    #        Does it need to be an installed package and won't work from the source tree?
+    for filename in INCLUDED_HTTP_RESOURCES:
+        with (working_directory / filename).open('wb') as working_file:
+            shutil.copyfileobj(importlib.resources.open_binary(__package__, filename), working_file)
+
+
 def start_server(bind_address, working_directory):
-    print(bind_address)
-    print(working_directory)
     with http.server.ThreadingHTTPServer(bind_address, functools.partial(RequestHandler, directory=working_directory)) as httpd:
         httpd.serve_forever()
