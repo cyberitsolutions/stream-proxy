@@ -8,6 +8,8 @@ def hls(input_pipe, output_dir: pathlib.Path):
 
     ffmpeg_proc = subprocess.Popen([
         'ffmpeg',
+        '-loglevel', '24',
+
         # Take input from stdin
         '-i', '-',
         # Output to HLS for browser playback with HLS.js

@@ -9,6 +9,7 @@ import urllib.parse
 def use_ytdl(stream_url):
     ytdl_proc = subprocess.Popen([
         'youtube-dl',
+        '--quiet',
         # Stop running once the stream ends
         # FIXME: May stop running when there's a short-term transient issue?
         '--abort-on-unavailable-fragment',
@@ -30,7 +31,13 @@ def use_multicat(stream_url):
     # -a     Append to existing destination file (risky)
     # -U     Destination has no RTP header
     # NOTE: multicat did not accept '-' or '/dev/stdout' as valid output
-    multicat_proc = subprocess.Popen(['multicat', stream_url, '-a', '-U', '/dev/fd/1'], stdout=subprocess.PIPE)
+    multicat_proc = subprocess.Popen([
+        'multicat',
+        stream_url,
+        '-a',
+        '-U',
+        '/dev/fd/1',
+    ], stdout=subprocess.PIPE)
 
     return multicat_proc.stdout
 
