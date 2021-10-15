@@ -17,7 +17,7 @@ def use_ytdl(stream_url):
         # Use the best mp4 available, mp4 theoretically reduces the re-encoding and re-muxing effort required
         '--format=best[ext=mp4]',
         # Send output to stdout
-        '--output', '-'
+        '--output', '-',
         # Grab from given stream URL
         '--', stream_url,
     ], stdout=subprocess.PIPE)
