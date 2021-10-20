@@ -1,25 +1,31 @@
 #!/usr/bin/python3
+"""
+Use youtube-dl and multicat (more in future?) to proxy HLS and RTP streams.
+
+HLS output will use base64 to automatically determine the source to proxy from the path being browsed.
+Do this to find the base64ed version a given URL: base64.urlsafe_b64encode(b"URL").decode()
+"""
 import argparse
-import base64
 import os
 import pathlib
 import shutil
-import sys
 
 from . import http_handler
 from . import inputs
 from . import outputs
 
 # Argument handling
-parser = argparse.ArgumentParser(description=__doc__)
+# FIXME: Probably shouldn't use RawDescriptionHelpFormatter because it won't do any word wrapping,
+#        but I wanted my lines separated out into paragraphs how I wrote them.
+parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+parser.add_argument('input_urls', nargs='*', default=None, metavar='INPUT_URL',
+                    help="Only accept these input URLs for proxying")
 parser.add_argument('--hls-working-directory', metavar='PATH',
                     type=pathlib.Path, default=None,
                     help=f"Where to store the temporary files for HLS output. (default: $XDG_RUNTIME_DIR/{__package__})")
-parser.add_argument('--input-address', metavar='URL',
-                    help="Only accept this input address instead of letting the HLS client decide.")
 parser.add_argument('--multicast-output-address', metavar='IP:PORT',
                     help="Uses multicast output instead of starting the HLS web listener. "
-                         "Requires --input-address")
+                         "Requires exactly 1 INPUT_URL")
 
 parser.add_argument('--http-listening-port',
                     type=int, default=80,
@@ -27,10 +33,10 @@ parser.add_argument('--http-listening-port',
 
 args = parser.parse_args()
 
-if args.multicast_output_address and not args.input_address:
+if args.multicast_output_address and not len(args.input_urls) == 1:
     # FIXME: Is it ok to use argparse's exceptions like this?
     raise argparse.ArgumentError(args.multicast_output_address,
-                                 "Can't specify a multicast output without including an input address")
+                                 "Can't specify a multicast output without exactly 1 INPUT_URL")
 
 if not args.hls_working_directory:
     # $XDG_RUNTIME_DIR, or $TMPDIR, or /tmp
@@ -40,39 +46,25 @@ if not args.hls_working_directory:
                                                              '/tmp'))
                                               ) / __package__
     # If it's the default directory we control it entirely and should delete it before we start
-    shutil.rmtree(args.hls_working_directory)
+    if args.hls_working_directory.is_dir():
+        print("Clearing old working directory")
+        shutil.rmtree(args.hls_working_directory)
+    else:
+        args.hls_working_directory.mkdir()
 
 if args.multicast_output_address:
     # Multicast mode, easiest control mode there is
-    input_pipe = inputs.autoselect(args.input_address)
-    output_proc = outputs.multicast(input_pipe, args.multicast_output_address)
+    input_proc = inputs.autoselect(args.input_urls[1])
+    output_proc = outputs.multicast(input_proc.stdout, args.multicast_output_address)
 
     output_proc.wait()
 
 else:
-    # HLS mode, this is where things get trickier
-    if not args.input_address:
-        raise NotImplementedError("Can't auto detect input address yet")
+    # HLS mode, so we need a smart HTTP server.
+
+    http_handler.acceptable_input_addresses = args.input_urls
 
     http_handler.setup_working_directory(args.hls_working_directory)
 
-    # When using running multiple HLS streams we'll need to tell them apart.
-    # I tried using urllib.parse.quote() but that was painful to find the right URL for the browser given the nested quoting.
-    # Base64 is a bit annoying since it expects bytes not strings, but was the easiest to make work.
-    b64_input_address = base64.urlsafe_b64encode(args.input_address.encode()).decode()
-
-    input_pipe = inputs.autoselect(args.input_address)
-    output_proc = outputs.hls(input_pipe, (args.hls_working_directory / b64_input_address))
-
-    # This try except is only meant to clean up the ytdl & ffmpeg processes when Ctrl-C is pressed
-    try:
-        http_handler.start_server(bind_address=('0.0.0.0', args.http_listening_port), working_directory=args.hls_working_directory)
-    finally:
-        print("Wait a sec while I kill off the ffmpeg processes", file=sys.stderr)
-        # Youtube-dl exits when it can't write to the output anymore
-        # Ffmpeg exits when it finishes reading from the input
-        # So closing the input pipe is enough to make them clean themselves up
-
-        # FIXME: Properly kill all processes, don't just rely on things cleaning up politely
-        input_pipe.close()
-        output_proc.wait()
+    # This blocks forever even after streams have ended
+    http_handler.start_server(bind_address=('0.0.0.0', args.http_listening_port), working_directory=args.hls_working_directory)

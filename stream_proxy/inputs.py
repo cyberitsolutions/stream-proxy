@@ -23,7 +23,7 @@ def use_ytdl(stream_url):
         '--', stream_url,
     ], stdout=subprocess.PIPE)
 
-    return ytdl_proc.stdout
+    return ytdl_proc
 
 
 def use_multicat(stream_url):
@@ -39,7 +39,7 @@ def use_multicat(stream_url):
         '/dev/fd/1',
     ], stdout=subprocess.PIPE)
 
-    return multicat_proc.stdout
+    return multicat_proc
 
 
 def autoselect(stream_url):
