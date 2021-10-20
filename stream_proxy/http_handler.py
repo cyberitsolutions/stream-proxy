@@ -39,17 +39,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
         return translated
 
-    def send_head(self):
-        # FIXME: Delay *only* for master.m3u8
-        # FIXME: Use this to trigger the youtube-dl|ffmpeg process when the master.m3u8 (or index.html?) is requested
-        # Both do_GET and do_HEAD run this first, so this is the easiest spot to delay if file doesn't exist yet
-        path = pathlib.Path(self.translate_path(self.path))
-        if not path.exists():
-            # Just wait a couple seconds, it'll appear soon... hopefully
-            # FIXME: This should be done in the JS as a retry attempt,
-            # but I don't understand JS enough to get that deep in HLS.js yet
-            time.sleep(3)
-        return super().send_head()
+        return translated
 
 
 def setup_working_directory(working_directory):

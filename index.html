@@ -20,6 +20,13 @@
         }
       }
     }
+
+    function hls_try_reload(hls, url, video) {
+      hls.loadSource(url);
+      hls.recoverMediaError();
+      video.play();
+    }
+
     fix_hls_video_elements = function() {
       var video_elements = document.querySelectorAll('video');
       video_elements.forEach(function (video) {
@@ -35,9 +42,32 @@
           // FIXME: Doesn't handle <video><source/></video> style
           // FIXME: Is it really safe to assume all .m3u8 is HLS?
           console.log("Handling media with HLS.js");
-          var hls = new Hls({autoStartLoad: false});
+          var hls = new Hls({
+                    autoStartLoad: false,
+                    // // None of these affect what happens when master.m3u8 404s because it doesn't exist yet.
+                    // // Hence hls.on(hlsjs.Events.ERROR... below
+                    // manifestLoadingTimeOut: 10000,
+                    // manifestLoadingMaxRetry: 10,
+                    // manifestLoadingRetryDelay: 5000,
+                    // manifestLoadingMaxRetryTimeout: 50000,
+                });
           hls.loadSource(video.src);
           hls.attachMedia(video);
+          // It can take a number of seconds for youtube-dl and ffmpeg to actually create the master.m3u8 file,
+          // during which time hls.js will have normally tried, failed, and given up for good.
+          // So this just makes it permanently retry forever.
+          //
+          // FIXME: Doesn't care if the stream has already started at all or whether it's the playlist file,
+          //        will simply retry forever on *any* 404
+          //
+          // ref: https://github.com/video-dev/hls.js/issues/1714#issuecomment-389668354
+          hls.on(Hls.Events.ERROR, (event, data) => {
+            console.log("HLS error event", event, data);
+            if (data.type == Hls.ErrorTypes.NETWORK_ERROR && data.response.code == 404) {
+                console.log("network error on playlist load, retrying in 1 second.");
+                this.hlsTryLoadTimer = setTimeout(() => hls_try_reload(hls, data.url, video), 1000);
+            }
+          });
 
           // HLS.js replaces the poster with the first frame as soon as it loads.
           // This is a problem if it's loading before it starts playing because the poster will instruct the user to press play.
