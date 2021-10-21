@@ -1,0 +1,46 @@
+[Unit]
+Description=Proxy for HLS & RTP streams
+Requires=network-online.target
+
+[Service]
+# Python3 defaults to quite a large buffer for stdout/stderr.
+# This makes the journal significantly less useful for debugging because the log messages don't appear immediately.
+Environment=PYTHONUNBUFFERED=LiterallyAnyNonZeroString
+
+ExecStart=/usr/local/bin/stream-proxy
+
+DynamicUser=true
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+ProtectProc=noaccess
+# This might write access to /run/user/...
+# but ProtectHome=tmpfs probably resolves that
+ProtectSystem=strict
+ProtectHome=tmpfs
+PrivateTmp=true
+PrivateDevices=true
+# This seems to break AmbientCapabilities=CAP_NET_BIND_SERVICE.
+# I don't understand why, but commenting it out solves the problem.
+#PrivateUsers=true
+ProtectClock=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+# I don't know how to add UDP multicast to this list.
+# Apparently I don't need to as multicast is just working with this as is.
+# FIXME: Investigate why, is this even working at all?
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+# Should we really set this one? Video streaming stuff may want real time speediness
+RestrictRealtime=true
+RestrictSUIDSGID=true
+# Unnecessary due to PrivateIPC=true?
+# RemoveIPC=true
+PrivateMounts=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
