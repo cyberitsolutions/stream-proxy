@@ -37,15 +37,13 @@ def hls(input_pipe, output_dir: pathlib.Path):
 
 
 def multicast(input_pipe, output_address):
-    raise NotImplementedError("Multicat output hasn't been implemented yet")
     # Multicat doesn't support long-options, so here's the descriptions for the short-options used:
     # -t <ttl>      TTL of the packets send by multicat
-    # NOTE: multicat did not accept '-' or '/dev/stdout' as valid, so I'm assuming the same for input
     multicat_proc = subprocess.Popen([
         'multicat',
         '-t', '2',
-        '/dev/fd/0',
+        '/dev/stdin',
         output_address,
-    ])
+    ], stdin=input_pipe)
 
     return multicat_proc

@@ -23,9 +23,10 @@ parser.add_argument('input_urls', nargs='*', default=None, metavar='INPUT_URL',
 parser.add_argument('--hls-working-directory', metavar='PATH',
                     type=pathlib.Path, default=None,
                     help=f"Where to store the temporary files for HLS output. (default: $XDG_RUNTIME_DIR/{__package__})")
-parser.add_argument('--multicast-output-address', metavar='IP:PORT',
-                    help="Uses multicast output instead of starting the HLS web listener. "
-                         "Requires exactly 1 INPUT_URL")
+# Setting a variable here because this one is used to raise my own exception below,
+multicast_arg = parser.add_argument('--multicast-output-address', metavar='IP:PORT',
+                                    help="Uses multicast output instead of starting the HLS web listener. "
+                                    "Requires exactly 1 INPUT_URL")
 
 parser.add_argument('--http-listening-port',
                     type=int, default=80,
@@ -35,7 +36,7 @@ args = parser.parse_args()
 
 if args.multicast_output_address and not len(args.input_urls) == 1:
     # FIXME: Is it ok to use argparse's exceptions like this?
-    raise argparse.ArgumentError(args.multicast_output_address,
+    raise argparse.ArgumentError(multicast_arg,
                                  "Can't specify a multicast output without exactly 1 INPUT_URL")
 
 if not args.hls_working_directory:
@@ -54,7 +55,7 @@ if not args.hls_working_directory:
 
 if args.multicast_output_address:
     # Multicast mode, easiest control mode there is
-    input_proc = inputs.autoselect(args.input_urls[1])
+    input_proc = inputs.autoselect(args.input_urls[0])
     output_proc = outputs.multicast(input_proc.stdout, args.multicast_output_address)
 
     output_proc.wait()

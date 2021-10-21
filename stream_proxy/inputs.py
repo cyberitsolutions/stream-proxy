@@ -3,8 +3,6 @@ import urllib.parse
 
 
 # FIXME: Can we catch if the process crashes immediately or would that require adding a delay before returning?
-# FIXME: Should we return the process instead of stdout to better deal with killing it later?
-#        Does closing stdout deal with that well enough?
 
 def use_ytdl(stream_url):
     ytdl_proc = subprocess.Popen([
@@ -30,13 +28,12 @@ def use_multicat(stream_url):
     # Multicat doesn't support long-options, so here's the descriptions for the short-options used:
     # -a     Append to existing destination file (risky)
     # -U     Destination has no RTP header
-    # NOTE: multicat did not accept '-' or '/dev/stdout' as valid output
     multicat_proc = subprocess.Popen([
         'multicat',
         stream_url,
         '-a',
         '-U',
-        '/dev/fd/1',
+        '/dev/stdout',
     ], stdout=subprocess.PIPE)
 
     return multicat_proc
@@ -45,7 +42,7 @@ def use_multicat(stream_url):
 def autoselect(stream_url):
     url = urllib.parse.urlparse(stream_url)
     if url.scheme == 'rtp' and url.netloc.startswith('@'):
-        return use_multicat(stream_url)
+        return use_multicat(url.netloc)
     elif url.scheme in ('http', 'https'):
         return use_ytdl(stream_url)
     else:
