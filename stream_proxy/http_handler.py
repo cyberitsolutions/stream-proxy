@@ -11,13 +11,13 @@ import time
 
 from . import inputs
 from . import outputs
+from . import http_resources
 
 
-INCLUDED_HTTP_RESOURCES = [
-    'index.html',
-    'press-play.svg',
-    'favicon.ico',
-]
+# FIXME: Is this really the best way to do this?
+INCLUDED_HTTP_RESOURCES = [r for r in importlib.resources.contents(http_resources)]
+INCLUDED_HTTP_RESOURCES.remove('__init__.py')
+INCLUDED_HTTP_RESOURCES.remove('__pycache__')
 
 _tuned_streams = {}
 acceptable_input_addresses = None  # default is accept all
@@ -91,7 +91,7 @@ def setup_working_directory(working_directory):
     for filename in INCLUDED_HTTP_RESOURCES:
         with (working_directory / filename).open('wb') as working_file:
             try:
-                shutil.copyfileobj(importlib.resources.open_binary(__package__, filename), working_file)
+                shutil.copyfileobj(importlib.resources.open_binary(http_resources, filename), working_file)
             except FileNotFoundError:
                 print(f'Resource not found "{filename}", continuing anyway')
                 (working_directory / filename).unlink()
