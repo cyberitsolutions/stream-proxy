@@ -9,6 +9,8 @@ import shutil
 import sys
 import time
 
+import systemd
+
 from . import inputs
 from . import outputs
 from . import http_resources
@@ -20,7 +22,7 @@ INCLUDED_HTTP_RESOURCES.remove('__init__.py')
 INCLUDED_HTTP_RESOURCES.remove('__pycache__')
 
 _tuned_streams = {}
-acceptable_input_addresses = None  # default is accept all
+acceptable_input_addresses = []  # default is accept all
 
 
 def _maybe_tune_stream(b64_input_address, output_directory):
@@ -86,15 +88,12 @@ def setup_working_directory(working_directory):
     if not working_directory.is_dir():
         working_directory.mkdir()
 
-    # FIXME: Why is importlib.resources.contents() not showing the resources?
-    #        Does it need to be an installed package and won't work from the source tree?
+    # NOTE: I could do both with/as in a single line,
+    #       but then the line is really long and there's no good way to wrap them.
     for filename in INCLUDED_HTTP_RESOURCES:
-        with (working_directory / filename).open('wb') as working_file:
-            try:
-                shutil.copyfileobj(importlib.resources.open_binary(http_resources, filename), working_file)
-            except FileNotFoundError:
-                print(f'Resource not found "{filename}", continuing anyway')
-                (working_directory / filename).unlink()
+        with importlib.resources.open_binary(http_resources, filename) as resource_file:
+            with (working_directory / filename).open('wb') as working_file:
+                shutil.copyfileobj(resource_file, working_file)
 
 
 def start_server(bind_address, working_directory):
@@ -102,9 +101,11 @@ def start_server(bind_address, working_directory):
     try:
         with http.server.ThreadingHTTPServer(
                 bind_address, functools.partial(RequestHandler, directory=working_directory)) as httpd:
+            systemd.daemon.notify('READY=1')
             httpd.serve_forever()
     finally:
-        print("Wait a few seconds while I kill off the streaming processes", file=sys.stderr)
+        systemd.daemon.notify('STOPPING=1')
+        print("Wait a few seconds while I kill off the streaming processes", file=sys.stderr, flush=True)
         for (input_proc, output_proc, output_dir) in _tuned_streams.values():
             # Youtube-dl exits when it can't write to the output anymore
             # Ffmpeg exits when it finishes reading from the input
