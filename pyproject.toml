@@ -9,8 +9,10 @@ home-page = "https://github.com/cyberitsolutions/stream-proxy"
 description-file = "README.rst"
 # May be fine with older versions, but I've no intention of testing how far back it goes.
 requires-python = ">=3.5"
-# FIXME: Should change the code so this can be an "extras" requirement, as the code can be used without a systemd unit.
-requires = ["systemd-python"]
+requires = [
+    # FIXME: Should change the code so this can be an "extras" requirement, as the code can be used without a systemd unit.
+    "systemd-python",  # python3-systemd in Debian
+]
 
 [tool.flit.entrypoints.console_scripts]
 # Shouldn't I be using tools.flit.scripts instead?
