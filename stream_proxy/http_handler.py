@@ -8,6 +8,7 @@ import pathlib
 import shutil
 import sys
 import time
+import urllib.parse
 
 import systemd
 
@@ -80,6 +81,34 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_error(http.HTTPStatus.FORBIDDEN, "That stream has not been enabled")
 
         return translated
+
+    def send_head(self):
+        """
+        Redirect to the stream playback URL for a given query URL.
+
+        For use with browser registered protocol handlers.
+        """
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == '/protocol-handler':
+            queries = urllib.parse.parse_qs(parsed.query)
+            assert len(queries) == 1 and len(queries['url']) == 1, "Bad query keys provided"
+
+            # Browsers have a predefined list of allowed protocol handlers (and 'rtp' is NOT one of them)
+            # but do allow for custom protocols so long as they're prefixed with 'web+'.
+            # So just remove 'web+' to allow for the browser to add that to any protocol it wants us to handle.
+            if queries['url'][0].startswith('web+'):
+                stream_url = queries['url'][0][len('web+'):]
+            else:
+                stream_url = queries['url'][0]
+            redir_path = base64.urlsafe_b64encode(stream_url.encode()).decode()
+
+            # Send the actual redirect
+            self.send_response(http.HTTPStatus.MOVED_PERMANENTLY)
+            self.send_header("Location", "/{}/".format(redir_path))
+            self.end_headers()
+            return None
+        else:
+            return super().send_head()
 
 
 def setup_working_directory(working_directory):

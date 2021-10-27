@@ -87,6 +87,9 @@
       });
     }
     window.onload = fix_hls_video_elements;
+
+    // This should also set in Chromium's policy
+    navigator.registerProtocolHandler("web+rtp", window.location.origin + "/protocol-handler?url=%s", "multicast video");
   </script>
 
   <style>
