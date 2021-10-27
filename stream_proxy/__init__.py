@@ -7,3 +7,23 @@ Do this to find the base64ed version a given URL: base64.urlsafe_b64encode(b"URL
 
 __author__ = "Mike Abrahall"
 __version__ = "0.1.0"
+
+import pathlib
+import argparse
+
+
+# Argument handling
+# FIXME: Probably shouldn't use RawDescriptionHelpFormatter because it won't do any word wrapping,
+#        but I wanted my lines separated out into paragraphs how I wrote them.
+argparser = argparse.ArgumentParser(prog="stream-proxy", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+argparser.add_argument('input_urls', nargs='*', default=[], metavar='INPUT_URL',
+                       help="Only accept these input URLs for proxying")
+argparser.add_argument('--hls-working-directory', metavar='PATH',
+                       type=pathlib.Path,
+                       help="Where to store the temporary files for HLS output. (default: RUNTIME_DIR/{})".format(__package__))
+argparser.add_argument('--multicast-output-address', metavar='IPPORT',
+                       help="Uses multicast output instead of starting the HLS web listener. "
+                       "Requires exactly 1 INPUT_URL")
+argparser.add_argument('--http-listening-port',
+                       type=int, default=80,
+                       help="For running as non-root during development (default: 80)")

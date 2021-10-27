@@ -6,11 +6,12 @@ import shutil
 
 import systemd.daemon
 
+from . import argparser
 from . import http_handler
 from . import inputs
 from . import outputs
 
-# $RUNTIME_DIRECTORY, $XDG_RUNTIME_DIR, or $TMPDIR, or /tmp
+# $RUNTIME_DIRECTORY, $XDG_RUNTIME_DIR, $TMPDIR, or /tmp
 # Then add the package name to the end
 DEFAULT_WORKING_DIR = pathlib.Path(os.environ.get('RUNTIME_DIRECTORY',
                                                   os.environ.get('XDG_RUNTIME_DIR',
@@ -18,29 +19,12 @@ DEFAULT_WORKING_DIR = pathlib.Path(os.environ.get('RUNTIME_DIRECTORY',
                                                                                 '/tmp'))
                                                   )) / __package__
 
-# Argument handling
-# FIXME: Probably shouldn't use RawDescriptionHelpFormatter because it won't do any word wrapping,
-#        but I wanted my lines separated out into paragraphs how I wrote them.
-parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-parser.add_argument('input_urls', nargs='*', default=[], metavar='INPUT_URL',
-                    help="Only accept these input URLs for proxying")
-parser.add_argument('--hls-working-directory', metavar='PATH',
-                    type=pathlib.Path, default=DEFAULT_WORKING_DIR,
-                    help="Where to store the temporary files for HLS output. (default: $XDG_RUNTIME_DIR/{})".format(__package__))
-# Setting a variable here because this one is used to raise my own exception below,
-multicast_arg = parser.add_argument('--multicast-output-address', metavar='IP:PORT',
-                                    help="Uses multicast output instead of starting the HLS web listener. "
-                                    "Requires exactly 1 INPUT_URL")
-
-parser.add_argument('--http-listening-port',
-                    type=int, default=80,
-                    help="For running as non-root during development (default: 80)")
-
-args = parser.parse_args()
+argparser.set_defaults(hls_working_directory=DEFAULT_WORKING_DIR)
+args = argparser.parse_args()
 
 if args.multicast_output_address and not len(args.input_urls) == 1:
     # FIXME: Is it ok to use argparse's exceptions like this?
-    raise argparse.ArgumentError(multicast_arg,
+    raise argparse.ArgumentError(None,  # Expects an argument object, not a string.
                                  "Can't specify a multicast output without exactly 1 INPUT_URL")
 
 if args.hls_working_directory == DEFAULT_WORKING_DIR:
