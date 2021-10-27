@@ -1,0 +1,19 @@
+Source: stream-proxy
+Section: devel
+Priority: optional
+Standards-Version: 4.5.0
+Vcs-Git: https://github.com/cyberitsolutions/stream-proxy
+Rules-Requires-Root: no
+Maintainer: Mike Abrahall <mike@cyber.com.au>
+Build-Depends:
+ debhelper-compat (= 13),
+ dh-sequence-python3,
+ python3,
+ flit
+
+Package: python3-stream-proxy
+Architecture: all
+Depends: ${misc:Depends}, ${python3:Depends},
+ python3-systemd
+Description: FIXME
+ FIXME

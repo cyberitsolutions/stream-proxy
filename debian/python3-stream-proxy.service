@@ -8,7 +8,7 @@ Type=notify
 # This makes the journal significantly less useful for debugging because the log messages don't appear immediately.
 Environment=PYTHONUNBUFFERED=LiterallyAnyNonZeroString
 
-ExecStart=/usr/local/bin/stream-proxy
+ExecStart=/usr/bin/stream-proxy
 
 RuntimeDirectory=%N
 DynamicUser=yes
