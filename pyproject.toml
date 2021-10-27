@@ -1,0 +1,24 @@
+[build-system]
+requires = ["flit_core >=2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "stream_proxy"
+authors = {name = "Mike Abrahall"}
+readme = "README.rst"
+requires-python = ">=3.5"
+
+# May be fine with older versions, but I've no intention of testing how far back it goes.
+# FIXME: Should change the code so this can be an optional dependency, as the code can be used without a systemd unit.
+dependencies = ["systemd-python"]
+
+[project.urls]
+Source = "https://github.com/cyberitsolutions/stream-proxy"
+
+[project.scripts]
+stream-proxy = "stream_proxy:__main__"
+
+#[tool.flit.entrypoints.console_scripts]
+## Shouldn't I be using tools.flit.scripts instead?
+## That didn't seem to have any effect, but why?
+#stream-proxy = "stream_proxy:__main__"
