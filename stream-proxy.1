@@ -1,0 +1,38 @@
+.TH stream-proxy "1" Manual
+.SH NAME
+stream-proxy
+.SH SYNOPSIS
+.B stream-proxy
+[-h] [--hls-working-directory PATH] [--multicast-output-address IPPORT] [--http-listening-port HTTP_LISTENING_PORT] [INPUT_URL ...]
+.SH DESCRIPTION
+Use youtube\-dl and multicat (more in future?) to proxy HLS and RTP streams.
+.br
+
+.br
+HLS output will use base64 to automatically determine the source to proxy from the path being browsed.
+.br
+Do this to find the base64ed version a given URL: base64.urlsafe_b64encode(b"URL").decode()
+.SH OPTIONS
+.TP
+\fBINPUT_URL\fR
+Only accept these input URLs for proxying
+
+.TP
+\fB\-\-hls\-working\-directory\fR PATH
+Where to store the temporary files for HLS output. (default: RUNTIME_DIR/)
+
+.TP
+\fB\-\-multicast\-output\-address\fR IPPORT
+Uses multicast output instead of starting the HLS web listener. Requires exactly 1 INPUT_URL
+
+.TP
+\fB\-\-http\-listening\-port\fR \fI\,HTTP_LISTENING_PORT\/\fR
+For running as non\-root during development (default: 80)
+
+.SH AUTHORS
+.B stream\-proxy
+was written by Mike Abrahall <mike@cyber.com.au>.
+.SH DISTRIBUTION
+The latest version of stream\-proxy may be downloaded from
+.UR https://github.com/cyberitsolutions/stream\-proxy
+.UE
