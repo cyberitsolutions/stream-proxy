@@ -1,0 +1,9 @@
+{
+    "RegisteredProtocolHandlers": [
+        {
+            "protocol": "web+rtp",
+            "url": "http://localhost/rtp-protocol-handler?url=%s",
+            "default": true
+        }
+    ]
+}
