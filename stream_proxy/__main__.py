@@ -32,7 +32,7 @@ parser.add_argument('input_urls', nargs='*', default=[], metavar='INPUT_URL',
                     help="Only accept these input URLs for proxying")
 parser.add_argument('--hls-working-directory', metavar='PATH',
                     type=pathlib.Path, default=DEFAULT_WORKING_DIR,
-                    help=f"Where to store the temporary files for HLS output. (default: $XDG_RUNTIME_DIR/{__package__})")
+                    help="Where to store the temporary files for HLS output. (default: $XDG_RUNTIME_DIR/{})".format(__package__))
 # Setting a variable here because this one is used to raise my own exception below,
 multicast_arg = parser.add_argument('--multicast-output-address', metavar='IP:PORT',
                                     help="Uses multicast output instead of starting the HLS web listener. "
