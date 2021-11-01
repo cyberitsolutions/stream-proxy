@@ -14,7 +14,10 @@ Build-Depends:
 Package: python3-stream-proxy
 Architecture: all
 Depends: ${misc:Depends}, ${python3:Depends},
- python3-systemd
+ python3-systemd,
+ youtube-dl,
+ ffmpeg,
+ multicat
 Enhances: chromium
 Description: FIXME
  FIXME
