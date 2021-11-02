@@ -2,10 +2,8 @@ import base64
 import functools
 import http
 import http.server
-import importlib.resources
 import os.path
 import pathlib
-import shutil
 import sys
 import time
 import urllib.parse
@@ -16,11 +14,6 @@ from . import inputs
 from . import outputs
 from . import http_resources
 
-
-# FIXME: Is this really the best way to do this?
-INCLUDED_HTTP_RESOURCES = [r for r in importlib.resources.contents(http_resources)]
-INCLUDED_HTTP_RESOURCES.remove('__init__.py')
-INCLUDED_HTTP_RESOURCES.remove('__pycache__')
 
 _tuned_streams = {}
 acceptable_input_addresses = []  # default is accept all
@@ -68,7 +61,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             filename = 'index.html'
             path = os.path.join(path, 'index.html')
 
-        if filename in INCLUDED_HTTP_RESOURCES:
+        if filename in http_resources.resources_list:
             # NOTE: This depends on filename not starting with a '/',
             #       otherwise it will leave off the directory.
             translated = os.path.join(self.directory, filename)
@@ -111,22 +104,10 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             return super().send_head()
 
 
-def setup_working_directory(working_directory):
-    """Copy useful package files into the working directory because http.server can't easily support with importlib.resources..."""
-    # FIXME: Should this just raise an exception instead?
-    if not working_directory.is_dir():
-        working_directory.mkdir()
-
-    # NOTE: I could do both with/as in a single line,
-    #       but then the line is really long and there's no good way to wrap them.
-    for filename in INCLUDED_HTTP_RESOURCES:
-        with importlib.resources.open_binary(http_resources, filename) as resource_file:
-            with (working_directory / filename).open('wb') as working_file:
-                shutil.copyfileobj(resource_file, working_file)
-
-
 def start_server(bind_address, working_directory):
     """Start the actual HTTP server. Blocks forever."""
+    http_resources.install_resources_to(working_directory)
+
     try:
         with http.server.ThreadingHTTPServer(
                 bind_address, functools.partial(RequestHandler, directory=working_directory)) as httpd:
