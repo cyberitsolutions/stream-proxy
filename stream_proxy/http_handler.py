@@ -48,32 +48,57 @@ def _maybe_tune_stream(b64_input_address, output_directory):
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
     """Handle the stream proxying for a single HTTP connection."""
 
+    def __init__(self, *args, directory: pathlib.Path, **kwargs):
+        self.directory = directory
+        assert self.directory.is_absolute()
+        return super().__init__(*args, **kwargs)
+
     def translate_path(self, path):
-        """Wrap parent translate_path to get a couple of always-available resources from the root of the working directory."""
-        # NOTE: I have confirmed that translated currently doesn't allow 'http://localhost/foo/../../../../etc/passwd".
-        #       I did put a small amount of effort into rewriting super().translate_path to better use urllib and pathlib,
-        #       but in doing so I realised there was a risk of introducing that kind of security bug, so left it alone.
-        translated = super().translate_path(path)
-        filename = translated.rpartition('/')[2]
+        """
+        Rewrite translate_path with urllib & pathlib to get some always-available resources from the root of the working directory.
 
-        if not filename:
-            # Default to index.html if trying to browse a directory
-            filename = 'index.html'
-            path = os.path.join(path, 'index.html')
+        We could get away with just wrapping the parent function in Python 3.9,
+        but Python 3.5 doesn't have self.directory and instead assumes current working directory.
+        While that may actually be valid in our circumstances I wasn't happy with relying on that.
+        """
+        # FIXME: Flake8 says this is "too complex", although it's only by a single if/try block
+        parsed = urllib.parse.urlparse(self.path)
+        path = self.directory
+        for part in pathlib.Path(parsed.path).parts:
+            # Ignore relative path components as they could be used nefariously.
+            # (ie, GET http://localhost/stream/../../../../etc/passwd)
+            # FIXME: This is the same way 3.9's translate_path function handles it, it feels kinda messy though
+            # FIXME: 3.9's paths can just do .resolve(), but 3.5 can only do that if most of the path dirs actually exist
+            if part not in (os.sep, os.curdir, os.pardir):
+                path = path.joinpath(part)
 
-        if filename in http_resources.resources_list:
-            # NOTE: This depends on filename not starting with a '/',
-            #       otherwise it will leave off the directory.
-            translated = os.path.join(self.directory, filename)
+        # pathlib.Path will lose the trailing slash and is_dir() only works if the path actually exists on the fs
+        if parsed.path.endswith('/'):
+            path = path.joinpath('index.html')
 
-        if filename == 'index.html':
-            stream_id = path[:-len('index.html')].strip('/')
-            # NOTE: Even though *I* passed directory as a pathlib.Path object to __init__,
-            #       http.server replaced it with os.fspath(directory).
-            if not _maybe_tune_stream(stream_id, pathlib.Path(self.directory) / stream_id):
-                self.send_error(http.HTTPStatus.FORBIDDEN, "That stream has not been enabled")
+        try:
+            if self.directory / path.relative_to(self.directory) != path:
+                print("Someone *might* be trying to browse outside of the working directory:", str(path), file=sys.stderr)
+                self.send_error(http.HTTPStatus.FORBIDDEN, "I don't know what you're doing, but it looks naughty")
+        except:  # noqa: E722
+            print("Someone tried to browse outside of the working directory:", str(path), file=sys.stderr)
+            self.send_error(http.HTTPStatus.FORBIDDEN, "That was very naughty")
 
-        return translated
+        if path.name == 'index.html':
+            stream_id = str(path.parent.relative_to(self.directory))
+            try:
+                if not _maybe_tune_stream(stream_id, self.directory / stream_id):
+                    self.send_error(http.HTTPStatus.FORBIDDEN, "That stream has not been enabled")
+            except:  # noqa: E722
+                self.send_error(http.HTTPStatus.INTERNAL_SERVER_ERROR, "There was a problem tuning to that stream")
+
+        if path.name in http_resources.resources_list:
+            path = self.directory.joinpath(path.name)
+
+        # Upstream's http.server does not use pathlib objects,
+        # so to reduce any chance of issues I'm just going to avoid returning one.
+        # FIXME: This should probably use os.fspath instead of str, but that's not available in py3.5
+        return str(path)
 
     def send_head(self):
         """
@@ -108,13 +133,22 @@ def start_server(bind_address, working_directory):
     """Start the actual HTTP server. Blocks forever."""
     http_resources.install_resources_to(working_directory)
 
+    # ThreadingHTTPServer isn't available until Python 3.7
+    # This likely means it can realistically only be used by 1 user at a time on <3.7
+    if hasattr(http.server, 'ThreadingHTTPServer'):
+        server = http.server.ThreadingHTTPServer
+    else:
+        server = http.server.HTTPServer
+
     try:
-        with http.server.ThreadingHTTPServer(
-                bind_address, functools.partial(RequestHandler, directory=working_directory)) as httpd:
-            systemd.daemon.notify('READY=1')
-            httpd.serve_forever()
+        # 3.5's http.server also doesn't support with/as. UGH, can I just give up on 3.5 support?
+        # I tried manually setting __enter__ & __exit__ to seemingly equivalent lambdas,
+        # but that resulted in the whole thing just hanging during __init__ and I don't understand why.
+        httpd = server(bind_address, functools.partial(RequestHandler, directory=working_directory))
+        systemd.daemon.notify('READY=1')  # Let systemd know we're ready to go
+        httpd.serve_forever()
     finally:
-        systemd.daemon.notify('STOPPING=1')
+        systemd.daemon.notify('STOPPING=1')  # Let systemd know we're cleaning up
         print("Wait a few seconds while I kill off the streaming processes", file=sys.stderr, flush=True)
         for (input_proc, output_proc, output_dir) in _tuned_streams.values():
             # Youtube-dl exits when it can't write to the output anymore
