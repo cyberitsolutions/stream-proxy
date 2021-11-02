@@ -1,3 +1,9 @@
+stream-proxy (0~3) unstable; urgency=medium
+
+  * Fixed support for Python 3.5
+
+ -- Mike Abrahall <mike@cyber.com.au>  Tue, 02 Nov 2021 18:21:05 +1100
+
 stream-proxy (0~2) unstable; urgency=medium
 
   * Initial release. (Closes: #XXXXXX)
