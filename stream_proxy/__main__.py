@@ -47,8 +47,6 @@ else:
 
     http_handler.acceptable_input_addresses = args.input_urls
 
-    http_handler.setup_working_directory(args.hls_working_directory)
-
     # This blocks forever even after streams have ended,
     # http_handler will notify systemd on both start & stopping, so we don't handle that here.
     http_handler.start_server(bind_address=('', args.http_listening_port), working_directory=args.hls_working_directory)
