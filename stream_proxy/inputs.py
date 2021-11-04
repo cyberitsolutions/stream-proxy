@@ -1,6 +1,9 @@
 import subprocess
 import urllib.parse
 
+ytdl_extra_args = []
+multicat_extra_args = []
+
 
 # FIXME: Can we catch if the process crashes immediately or would that require adding a delay before returning?
 
@@ -17,6 +20,7 @@ def use_ytdl(stream_url):
         '--format=best[ext=mp4]',
         # Send output to stdout
         '--output', '-',
+    ] + ytdl_extra_args + [
         # Grab from given stream URL
         '--', stream_url,
     ], stdout=subprocess.PIPE)
@@ -34,7 +38,7 @@ def use_multicat(stream_url):
         '-a',
         '-U',
         '/dev/stdout',
-    ], stdout=subprocess.PIPE)
+    ] + multicat_extra_args, stdout=subprocess.PIPE)
 
     return multicat_proc
 

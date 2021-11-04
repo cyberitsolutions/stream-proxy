@@ -22,6 +22,11 @@ DEFAULT_WORKING_DIR = pathlib.Path(os.environ.get('RUNTIME_DIRECTORY',
 argparser.set_defaults(hls_working_directory=DEFAULT_WORKING_DIR)
 args = argparser.parse_args()
 
+inputs.ytdl_extra_args = args.ytdl_arg
+inputs.multicat_extra_args = args.multicat_arg
+outputs.ffmpeg_extra_args = args.ffmpeg_arg
+outputs.multicat_extra_args = args.multicat_arg
+
 if args.multicast_output_address and not len(args.input_urls) == 1:
     # FIXME: Is it ok to use argparse's exceptions like this?
     raise argparse.ArgumentError(None,  # Expects an argument object, not a string.

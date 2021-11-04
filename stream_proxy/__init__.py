@@ -27,3 +27,13 @@ argparser.add_argument('--multicast-output-address', metavar='IPPORT',
 argparser.add_argument('--http-listening-port',
                        type=int, default=80,
                        help="For running as non-root during development (default: 80)")
+
+argparser.add_argument('--ytdl-arg',
+                       type=str, default=[], nargs='*',
+                       help="Argument to add to the youtube-dl call if youtube-dl is used. Repeat to specify multiple args")
+argparser.add_argument('--ffmpeg-arg',
+                       type=str, default=[], nargs='*',
+                       help="Argument to add to the ffmpeg call if ffmpeg is used. Repeat to specify multiple args")
+argparser.add_argument('--multicat-arg',
+                       type=str, default=[], nargs='*',
+                       help="Argument to add to the multicat call if multicat is used. Repeat to specify multiple args")

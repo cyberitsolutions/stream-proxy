@@ -1,6 +1,9 @@
 import pathlib
 import subprocess
 
+ffmpeg_extra_args = []
+multicat_extra_args = []
+
 
 def hls(input_pipe, output_dir: pathlib.Path):
     if not output_dir.is_dir():
@@ -31,7 +34,7 @@ def hls(input_pipe, output_dir: pathlib.Path):
         '-master_pl_name', 'master.m3u8',
         '-hls_segment_filename', str(output_dir / '%v_data%02d.ts'),
         str(output_dir / '%v_playlist.m3u8'),
-    ], stdin=input_pipe)
+    ] + ffmpeg_extra_args, stdin=input_pipe)
 
     return ffmpeg_proc
 
@@ -44,6 +47,6 @@ def multicast(input_pipe, output_address):
         '-t', '2',
         '/dev/stdin',
         output_address,
-    ], stdin=input_pipe)
+    ] + multicat_extra_args, stdin=input_pipe)
 
     return multicat_proc
