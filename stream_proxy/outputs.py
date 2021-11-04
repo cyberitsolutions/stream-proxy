@@ -23,7 +23,7 @@ def hls(input_pipe, output_dir: pathlib.Path):
         # FINDME: Change these values for less live delay
         # This is *supposed* to only keep the latest 6 .ts files in the playlist,
         # and delete old .ts files whenever there's more than 9 in the filesystem
-        '-hls_list_size', '6', '-hls_delete_threshold', '3', '-hls_flags', 'delete_segments',
+        '-hls_list_size', '6', '-hls_flags', 'delete_segments',  # '-hls_delete_threshold', '3',
         # But that doesn't seem to have any effect at all, while this long deprecated option still works.
         # FIXME: WHY?!?!?
         '-hls_wrap', '12',
@@ -31,9 +31,9 @@ def hls(input_pipe, output_dir: pathlib.Path):
         # This is where all the output files go.
         # The HTML only needs to reference the master_pl_name, HLS standards take care of the rest.
         # NOTE: master_pl_name is somehow relative to one of the other args
-        '-master_pl_name', 'master.m3u8',
-        '-hls_segment_filename', str(output_dir / '%v_data%02d.ts'),
-        str(output_dir / '%v_playlist.m3u8'),
+        # '-master_pl_name', 'master.m3u8',
+        '-hls_segment_filename', str(output_dir / 'data%02d.ts'),
+        str(output_dir / 'master.m3u8'),
     ] + ffmpeg_extra_args, stdin=input_pipe)
 
     return ffmpeg_proc
