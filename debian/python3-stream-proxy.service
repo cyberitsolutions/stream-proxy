@@ -13,9 +13,9 @@ Environment=PYTHONUNBUFFERED=LiterallyAnyNonZeroString
 # I've NOT experienced it with Python3.9 on Debian Bullseye
 # NOTE: I'd rather this be set to this service's RuntimeDirectory,
 #       but there's no specifier for that and I wasn't sure '%t/%N' would be reliable
-Environment=PYTHONUSERBASE="%T"
+Environment="PYTHONUSERBASE=%T"
 # ^ should be all that's needed, and was for my code, but youtube-dl was more picky and needs HOME as well
-Environment=HOME="%T"
+Environment="HOME=%T"
 
 ExecStart=/usr/bin/stream-proxy
 
