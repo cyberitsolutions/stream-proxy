@@ -156,17 +156,18 @@ def start_server(bind_address, working_directory: pathlib.Path):
         httpd.serve_forever()
     finally:
         systemd.daemon.notify('STOPPING=1')  # Let systemd know we're cleaning up
-        print("Wait a few seconds while I kill off the streaming processes", file=sys.stderr, flush=True)
-        for (input_proc, output_proc, output_dir) in _tuned_streams.values():
-            # Youtube-dl exits when it can't write to the output anymore
-            # Ffmpeg exits when it finishes reading from the input
-            # So closing the input pipe should be enough to make them clean themselves up
-            input_proc.stdout.close()
-            # But lets send a SIGTERM to be sure
-            input_proc.terminate()
-            output_proc.terminate()
-        time.sleep(3)
-        for (input_proc, output_proc, output_dir) in _tuned_streams.values():
-            # And lets SIGKILL anything still here, to be really sure
-            input_proc.kill()
+        if _tuned_streams:
+            print("Wait a few seconds while I kill off the streaming processes", file=sys.stderr, flush=True)
+            for (input_proc, output_proc, output_dir) in _tuned_streams.values():
+                # Youtube-dl exits when it can't write to the output anymore
+                # Ffmpeg exits when it finishes reading from the input
+                # So closing the input pipe should be enough to make them clean themselves up
+                input_proc.stdout.close()
+                # But lets send a SIGTERM to be sure
+                input_proc.terminate()
+                output_proc.terminate()
+            time.sleep(3)
+            for (input_proc, output_proc, output_dir) in _tuned_streams.values():
+                # And lets SIGKILL anything still here, to be really sure
+                input_proc.kill()
             output_proc.kill()
