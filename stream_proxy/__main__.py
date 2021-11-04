@@ -22,6 +22,8 @@ DEFAULT_WORKING_DIR = pathlib.Path(os.environ.get('RUNTIME_DIRECTORY',
 argparser.set_defaults(hls_working_directory=DEFAULT_WORKING_DIR)
 args = argparser.parse_args()
 
+os.chdir(str(args.hls_working_directory.parent))
+
 inputs.ytdl_extra_args = args.ytdl_arg
 inputs.multicat_extra_args = args.multicat_arg
 outputs.ffmpeg_extra_args = args.ffmpeg_arg
