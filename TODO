@@ -1,0 +1,6 @@
+# 34500
+* Cleanup deb package description/etc
+* Create manpage automatically at package build time
+
+* Somehow allow for using instantiated systemd units for multicast output
+* Alternatively use a config file to support multiple rtp outputs at once
