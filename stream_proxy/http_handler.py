@@ -53,40 +53,28 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         #       This was causing me problems as I couldn't stop the super().__init__ function from recasting it.
         #       So I renamed my own version of it, it's only used in translate_path anyway (which I also rewrote).
         #       I'm making sure to set it properly anyway, just in case.
-        self.working_directory = working_directory
-        assert self.working_directory.is_absolute()
-        try: super().__init__(*args, directory=working_directory, **kwargs)
-        except TypeError: super().__init__(*args, **kwargs)
+        assert working_directory.is_absolute()
+        super().__init__(*args, directory=str(working_directory), **kwargs)
 
     def translate_path(self, path):
-        """
-        Rewrite translate_path with urllib & pathlib to get some always-available resources from the root of the working directory.
+        """Wrap translate_path to get some always-available resources from the root of the working directory."""
 
-        We could get away with just wrapping the parent function in Python 3.9,
-        but Python 3.5 doesn't have self.directory and instead assumes current working directory.
-        While that may actually be valid in our circumstances I wasn't happy with relying on that.
-        """
-        # FIXME: Flake8 says this is "too complex", although it's only by a single if/try block
-        parsed = urllib.parse.urlparse(self.path)
-        path = self.working_directory
-        for part in pathlib.Path(parsed.path).parts:
-            # Ignore relative path components as they could be used nefariously.
-            # (ie, GET http://localhost/stream/../../../../etc/passwd)
-            # FIXME: This is the same way 3.9's translate_path function handles it, it feels kinda messy though
-            # FIXME: 3.9's paths can just do .resolve(), but 3.5 can only do that if most of the path dirs actually exist
-            if part not in (os.sep, os.curdir, os.pardir):
-                path = path.joinpath(part)
-
-        # pathlib.Path will lose the trailing slash and is_dir() only works if the path actually exists on the fs
-        if parsed.path.endswith('/'):
+        # pathlib.Path will lose the trailing slash and is_dir() only works if the path actually exists on the fs.
+        # So there's this slightly messy process to add 'index.html' onlny if the original path string ended with '/'
+        path_str = super().translate_path(path)
+        path = pathlib.Path(path)
+        if path_str.endswith('/'):
             path = path.joinpath('index.html')
 
+        # FIXME: Should we just drop this try/except and trust that the upstream http.server code handles this properly?
         try:
-            if self.working_directory / path.relative_to(self.working_directory) != path:
+            if self.directory / pathlib.Path(path).relative_to(self.directory) != path:
+                # This shouldn't actually happen because it happening at all should trigger the exception below
                 print("Someone *might* be trying to browse outside of the working directory:", str(path), file=sys.stderr)
-                self.send_error(http.HTTPStatus.FORBIDDEN, "I don't know what you're doing, but it looks naughty")
-        except:  # noqa: E722
-            print("Someone tried to browse outside of the working directory:", str(path), file=sys.stderr)
+                self.send_error(http.HTTPStatus.FORBIDDEN, "That looks naughty")
+        except ValueError as e:
+            # ValueError: '...' is not in the subpath of '...' OR one path is relative and the other is absolute.
+            print('ValueError:', e, file=sys.stderr)
             self.send_error(http.HTTPStatus.FORBIDDEN, "That was very naughty")
 
         if path.name == 'index.html':
@@ -140,20 +128,17 @@ def start_server(bind_address, working_directory: pathlib.Path):
     """Start the actual HTTP server. Blocks forever."""
     http_resources.install_resources_to(working_directory)
 
-    # ThreadingHTTPServer isn't available until Python 3.7
-    # This likely means it can realistically only be used by 1 user at a time on <3.7
-    if hasattr(http.server, 'ThreadingHTTPServer'):
-        server = http.server.ThreadingHTTPServer
-    else:
-        server = http.server.HTTPServer
+    # FIXME: Should we even bother with this check? It'll fail pretty quickly if we ignore it anyway
+    if sys.version_info < 3 or (sys.version_info == 3 and sys.version_info < 9):
+        raise RuntimeError("This requires at least Python 3.9 to work correctly")
+
+    server = http.server.ThreadingHTTPServer
 
     try:
-        # 3.5's http.server also doesn't support with/as. UGH, can I just give up on 3.5 support?
-        # I tried manually setting __enter__ & __exit__ to seemingly equivalent lambdas,
-        # but that resulted in the whole thing just hanging during __init__ and I don't understand why.
-        httpd = server(bind_address, functools.partial(RequestHandler, working_directory=working_directory))
-        systemd.daemon.notify('READY=1')  # Let systemd know we're ready to go
-        httpd.serve_forever()
+        with server(bind_address, functools.partial(RequestHandler, directory=working_directory)) as httpd:
+            httpd = server(bind_address, functools.partial(RequestHandler, working_directory=working_directory))
+            systemd.daemon.notify('READY=1')  # Let systemd know we're ready to go
+            httpd.serve_forever()
     finally:
         systemd.daemon.notify('STOPPING=1')  # Let systemd know we're cleaning up
         if _tuned_streams:
