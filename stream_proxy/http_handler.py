@@ -35,6 +35,12 @@ def _maybe_tune_stream(b64_input_address: str, output_directory: pathlib.Path):
         input_proc = inputs.autoselect(input_address)
         output_proc = outputs.hls(input_proc.stdout, output_directory)
 
+        # Wait up to 5s for the master.m3u8 file to appear
+        # FIXME: also check both processes for an exit status?
+        delay_start = time.monotonic()
+        while time.monotonic() < (delay_start + 5) and not (output_directory / 'master.m3u8').exists():
+            time.sleep(0.5)
+
         # FIXME: Use a named tuple or something more self-documented than relying on the order of the tuple?
         _tuned_streams[b64_input_address] = (input_proc, output_proc, output_directory)
     else:
