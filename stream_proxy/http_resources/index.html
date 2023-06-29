@@ -38,6 +38,7 @@
           //
           // If no native HLS support, check if HLS.js is supported
           //
+        // FIXME: Can we somehow query the actual filetype instead of the url string?
         } else if (Hls.isSupported() && video.src.toLowerCase().endsWith('.m3u8')) {
           // FIXME: Doesn't handle <video><source/></video> style
           // FIXME: Is it really safe to assume all .m3u8 is HLS?
@@ -113,7 +114,7 @@
   <video
     controls autoplay
 
-    src="master.m3u8"
+    src="videoplayback"
     poster="press-play.svg"
   ></video>
 </body>

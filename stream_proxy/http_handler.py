@@ -6,7 +6,9 @@ import pathlib
 import sys
 import time
 import urllib.parse
+import urllib.request
 
+import yt_dlp
 import systemd
 
 from . import inputs
@@ -17,9 +19,23 @@ from . import http_resources
 _tuned_streams = {}
 acceptable_input_addresses = []  # default is accept all
 
+yt = yt_dlp.YoutubeDL()
+
+
+def get_stream_playback_url(b64_input_address: str):
+    """Get a direct videoplayback URL for the given stream ID."""
+    stream_url = base64.urlsafe_b64decode(b64_input_address).decode()
+    stream_info = yt.extract_info(stream_url, download=False)
+    # FIXME: I have no idea what this 'https' protocol actually means, the URL mentioned Android, but I think they all do
+    # FIXME: HLS/DASH/etc is a better protocol for this kind of thing, I just didn't make sense of their entry in this list
+    # FIXME: Don't just grab the highest quality, our users likely only have 720p screens anyway
+    format_info = sorted([f for f in stream_info['formats'] if f['protocol'] == 'https'], key=lambda i: i['height'])[-1]
+    return format_info['url']
+
 
 def _maybe_tune_stream(b64_input_address: str, output_directory: pathlib.Path):
     """Tune in to stream if not already tuned in."""
+    return True  # FIXME: DEV
     if b64_input_address not in _tuned_streams or \
             _tuned_streams[b64_input_address][0].poll() is not None:
         # I tried using urllib.parse.quote() but that was painful to find the right URL for the browser given the nested quoting.
@@ -128,6 +144,26 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Location", "/{}/".format(redir_path))
             self.end_headers()
             return None
+        elif parsed.path.endswith('/videoplayback'):
+            path = pathlib.Path(self.translate_path(self.path))
+            proxied_url = get_stream_playback_url(str(path.parent.relative_to(self.directory)))
+            # FIXME: This is 'format_url' as mentioned in the README which we can query via yt-dlp
+            # NOTE: We will either have to whitelist this URL in squid, **live** proxy the request in this web server somehow.
+            #       Alternatively, if we used HLS/DASH somehow, we could have this web server pass on 1 segment at a time.
+            proxied_request = urllib.request.urlopen(proxied_url)
+            self.send_response(proxied_request.code)
+            # FIXME: How does this handle duplicated headers?
+            for header in proxied_request.headers:
+                # FIXME: There's probably other headers we'd want to drop.
+                # FIXME: Actually we only want to proxy the content-type and content-length headers.
+                if header not in ('Cross-Origin-Resource-Policy', 'Accept-Ranges'):
+                    self.send_header(header, proxied_request.headers[header])
+            # # Using a temporary redirect because YT at least expired their URLs after a short time.
+            # # So rather than letting Chromium cache that expired URL, it should always come back and ask again.
+            # self.send_response(http.HTTPStatus.TEMPORARY_REDIRECT)
+            self.end_headers()
+            # self.do_GET just kinda expects send_head here to handle figuring out what file to grab then return a file object.
+            return proxied_request
         else:
             return super().send_head()
 

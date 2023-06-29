@@ -42,3 +42,24 @@ I was able to make Squid force a redirect on YouTube URLs using this config::
 This could then be used to whitelist embedded streams near-seamlessly.
 The only thing the end-user would notice "wrong" would be the lack of YouTube styled control buttons,
 and maybe some extra metadata like subtitles/etc.
+
+Alternative approach
+--------------------
+I suspect with yt-dlp we might be able to do an almost direct whitelisting without any transcoding/downloading steps in between.
+This is largely just a bunch of notes with no real form to it yet.
+
+This will probably only work for static media, not live streams.
+Might also only work on YouTube, that's all I've tested with so far anyway.
+
+::
+
+    import yt_dlp
+    yt = yt_dlp.YoutubeDL()
+    media_info = yt.extract_info("https://www.youtube.com/watch?v=B1J6Ou4q8vE", download=False)
+    # FIXME: I have **no** idea what this 'https' protocol actually means, but VLC loaded them fine.
+    # FIXME: HLS/DASH/etc is a better protocol for this kind of thing, I just didn't make sense of their entry in this list
+    # FIXME: Don't just grab the highest quality, our users likely only have 720p screens anyway
+    format_info = sorted([f for f in info['formats'] if f['protocol'] == 'https'], key=lambda i: i['height'])[-1]
+    format_url = format_info['url']
+
+
