@@ -15,7 +15,7 @@ Package: python3-stream-proxy
 Architecture: all
 Depends: ${misc:Depends}, ${python3:Depends},
  python3-systemd,
- youtube-dl,
+ yt-dlp,
  ffmpeg,
  multicat
 Enhances: chromium

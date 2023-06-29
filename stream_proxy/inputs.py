@@ -9,7 +9,7 @@ multicat_extra_args = []
 
 def use_ytdl(stream_url):
     ytdl_proc = subprocess.Popen([
-        'youtube-dl',
+        'yt-dlp',
         '--quiet',
         # Stop running once the stream ends
         # FIXME: May stop running when there's a short-term transient issue?
