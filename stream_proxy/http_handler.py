@@ -18,7 +18,7 @@ _tuned_streams = {}
 acceptable_input_addresses = []  # default is accept all
 
 
-def _maybe_tune_stream(b64_input_address, output_directory):
+def _maybe_tune_stream(b64_input_address: str, output_directory: pathlib.Path):
     """Tune in to stream if not already tuned in."""
     if b64_input_address not in _tuned_streams or \
             _tuned_streams[b64_input_address][0].poll() is not None:
@@ -55,18 +55,21 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         assert directory.is_absolute()
         super().__init__(*args, directory=str(directory), **kwargs)
 
-    def translate_path(self, path):
+    def translate_path(self, path: str):
         """Wrap translate_path to get some always-available resources from the root of the working directory."""
         # pathlib.Path will lose the trailing slash and is_dir() only works if the path actually exists on the fs.
         # So there's this slightly messy process to add 'index.html' onlny if the original path string ended with '/'
         path_str = super().translate_path(path)
-        path = pathlib.Path(path_str)
         if path_str.endswith('/'):
-            path = path.joinpath('index.html')
+            path = pathlib.Path(path_str).joinpath('index.html')
+        else:
+            path = pathlib.Path(path_str)
+
+        working_directory = pathlib.Path(self.directory)
 
         # FIXME: Should we just drop this try/except and trust that the upstream http.server code handles this properly?
         try:
-            if self.directory / pathlib.Path(path).relative_to(self.directory) != path:
+            if working_directory / pathlib.Path(path).relative_to(working_directory) != path:
                 # This shouldn't actually happen because it happening at all should trigger the exception below
                 print("Someone *might* be trying to browse outside of the working directory:", str(path), file=sys.stderr)
                 self.send_error(http.HTTPStatus.FORBIDDEN, "That looks naughty")
@@ -76,17 +79,18 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             self.send_error(http.HTTPStatus.FORBIDDEN, "That was very naughty")
 
         if path.name == 'index.html':
-            stream_id = str(path.parent.relative_to(self.directory))
+            stream_id = str(path.parent.relative_to(working_directory))
             try:
-                if not _maybe_tune_stream(stream_id, self.directory / stream_id):
+                if not _maybe_tune_stream(stream_id, working_directory / stream_id):
                     self.send_error(http.HTTPStatus.FORBIDDEN, "That stream has not been enabled")
             except NotImplementedError:
                 self.send_error(http.HTTPStatus.INTERNAL_SERVER_ERROR, "That stream is not currently supported")
             except:  # noqa: E722
                 self.send_error(http.HTTPStatus.INTERNAL_SERVER_ERROR, "There was a problem tuning to that stream")
+                raise
 
         if path.name in http_resources.resources_list:
-            path = self.directory.joinpath(path.name)
+            path = working_directory.joinpath(path.name)
 
         # Upstream's http.server does not use pathlib objects,
         # so to reduce any chance of issues I'm just going to avoid returning one.
