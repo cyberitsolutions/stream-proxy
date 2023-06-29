@@ -1,8 +1,10 @@
 #!/usr/bin/python3
 import argparse
+import base64
 import os
 import pathlib
 import shutil
+import sys
 
 import systemd.daemon
 
@@ -53,6 +55,10 @@ else:
     # HLS mode, so we need a smart HTTP server.
 
     http_handler.acceptable_input_addresses = args.input_urls
+    print('Test URLs:', file=sys.stderr, flush=True)
+    for url in http_handler.acceptable_input_addresses:
+        print('* http://localhost:', args.http_listening_port, '/', base64.urlsafe_b64encode(url.encode()).decode(), '/',
+              sep='', file=sys.stderr, flush=True)
 
     # This blocks forever even after streams have ended,
     # http_handler will notify systemd on both start & stopping, so we don't handle that here.
