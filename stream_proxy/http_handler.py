@@ -2,7 +2,6 @@ import base64
 import functools
 import http
 import http.server
-import os.path
 import pathlib
 import sys
 import time
@@ -48,21 +47,20 @@ def _maybe_tune_stream(b64_input_address, output_directory):
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
     """Handle the stream proxying for a single HTTP connection."""
 
-    def __init__(self, *args, working_directory: pathlib.Path, **kwargs):
+    def __init__(self, *args, directory: pathlib.Path, **kwargs):
         # NOTE: Py3.9 has a self.directory variable which gets recast as a str,
         #       This was causing me problems as I couldn't stop the super().__init__ function from recasting it.
         #       So I renamed my own version of it, it's only used in translate_path anyway (which I also rewrote).
         #       I'm making sure to set it properly anyway, just in case.
-        assert working_directory.is_absolute()
-        super().__init__(*args, directory=str(working_directory), **kwargs)
+        assert directory.is_absolute()
+        super().__init__(*args, directory=str(directory), **kwargs)
 
     def translate_path(self, path):
         """Wrap translate_path to get some always-available resources from the root of the working directory."""
-
         # pathlib.Path will lose the trailing slash and is_dir() only works if the path actually exists on the fs.
         # So there's this slightly messy process to add 'index.html' onlny if the original path string ended with '/'
         path_str = super().translate_path(path)
-        path = pathlib.Path(path)
+        path = pathlib.Path(path_str)
         if path_str.endswith('/'):
             path = path.joinpath('index.html')
 
@@ -78,9 +76,9 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             self.send_error(http.HTTPStatus.FORBIDDEN, "That was very naughty")
 
         if path.name == 'index.html':
-            stream_id = str(path.parent.relative_to(self.working_directory))
+            stream_id = str(path.parent.relative_to(self.directory))
             try:
-                if not _maybe_tune_stream(stream_id, self.working_directory / stream_id):
+                if not _maybe_tune_stream(stream_id, self.directory / stream_id):
                     self.send_error(http.HTTPStatus.FORBIDDEN, "That stream has not been enabled")
             except NotImplementedError:
                 self.send_error(http.HTTPStatus.INTERNAL_SERVER_ERROR, "That stream is not currently supported")
@@ -88,7 +86,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_error(http.HTTPStatus.INTERNAL_SERVER_ERROR, "There was a problem tuning to that stream")
 
         if path.name in http_resources.resources_list:
-            path = self.working_directory.joinpath(path.name)
+            path = self.directory.joinpath(path.name)
 
         # Upstream's http.server does not use pathlib objects,
         # so to reduce any chance of issues I'm just going to avoid returning one.
@@ -129,14 +127,13 @@ def start_server(bind_address, working_directory: pathlib.Path):
     http_resources.install_resources_to(working_directory)
 
     # FIXME: Should we even bother with this check? It'll fail pretty quickly if we ignore it anyway
-    if sys.version_info < 3 or (sys.version_info == 3 and sys.version_info < 9):
+    if sys.version_info.major < 3 or (sys.version_info.major == 3 and sys.version_info.minor < 9):
         raise RuntimeError("This requires at least Python 3.9 to work correctly")
 
     server = http.server.ThreadingHTTPServer
 
     try:
         with server(bind_address, functools.partial(RequestHandler, directory=working_directory)) as httpd:
-            httpd = server(bind_address, functools.partial(RequestHandler, working_directory=working_directory))
             systemd.daemon.notify('READY=1')  # Let systemd know we're ready to go
             httpd.serve_forever()
     finally:
